@@ -47,7 +47,8 @@ Tiene la misma estructura que la versión en Java (Spring Boot) del curso Lengua
 | `public/` | Pantallas HTML5 + CSS3 + JavaScript, en las mismas carpetas que las plantillas | `templates/` y `static/` |
 | `test/` | Pruebas automáticas | `src/test` |
 | `database/bd_almacen_srh.sql` | Script de las 9 tablas, las 6 vistas y los datos iniciales | `database/` |
-| `database/cargar_datos_demo.js` | 30 días de datos simulados (opcional) | datos de prueba del script |
+| `database/datos_demo_30_dias.sql` | Historial simulado de 30 días para cargar en Workbench (opcional) | datos de prueba del script |
+| `database/cargar_datos_demo.js` | Generador de ese historial con los servicios del sistema (`npm run demo`) | — |
 | `docs/logica_sistema.md` | Documento de lógica del sistema (roles, reglas, procesos y rutas) | — |
 
 ## Cómo ejecutarlo
@@ -60,10 +61,26 @@ Necesitas Node.js 18 o superior y MySQL 8.
    ```
    npm install
    ```
-4. **Datos de demostración (opcional):** cargan 30 días de entradas, envíos, conteos y consumos. Solo funcionan sobre la base recién creada.
-   ```
-   npm run demo
-   ```
+4. **Historial de demostración (opcional):** carga 30 días de operación sobre la base recién creada. Las fechas son relativas al momento de la carga, así que el historial termina hoy. Hay dos formas:
+   - En MySQL Workbench, ejecuta `database/datos_demo_30_dias.sql` justo después de `bd_almacen_srh.sql`.
+   - O genéralo con el propio sistema (respeta todas las reglas de negocio):
+     ```
+     npm run demo
+     ```
+
+   Qué contiene el mes simulado:
+   - **Consumo:** los hospitales consumen todos los días por turno (mañana > tarde > noche), y Barton consume más que Kaelin.
+   - **Envíos:** Barton recibe uno cada 3 días y Kaelin cada 4, por lo que les falta hasta el próximo envío. La planta se abastece cada semana.
+   - **Compras:** el jefe compra cuando un producto alcanza para pocos días. El proveedor de alcohol se retrasa, el producto se agota y queda en «REPONER» con la compra en camino.
+   - **Incidencias:**
+     - una entrega incompleta;
+     - dos envíos que llegan diferentes (uno aprobado como pérdida y otro pendiente);
+     - una corrección y un duplicado anulado, dentro de 24 h;
+     - una corrección de más de 24 h, pendiente para el jefe;
+     - dos ajustes por conteo en el almacén;
+     - conteos semanales de verificación en las sedes;
+     - el envío de hoy a Kaelin, todavía sin confirmar.
+   - **Regenerar el `.sql`:** después de `npm run demo`, ejecuta `npm run demo:sql`.
 5. **Ejecutar:**
    ```
    npm start

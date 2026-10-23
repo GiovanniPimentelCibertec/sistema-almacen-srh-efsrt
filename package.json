@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/app.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
-    "demo": "node database/cargar_datos_demo.js"
+    "demo": "node database/cargar_datos_demo.js",
+    "demo:sql": "node database/exportar_demo_sql.js"
   },
   "engines": {
     "node": ">=18"
