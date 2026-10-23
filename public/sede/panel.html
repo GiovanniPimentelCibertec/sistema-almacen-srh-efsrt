@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mi sede | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="sede">
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Mi sede</h2>
+    <div id="mensajes"></div>
+
+    <div class="tarjeta aviso" id="sin-conteo" hidden>
+        <h3>Primero registre el conteo inicial</h3>
+        <p>Cuente lo que hay hoy en la sede. Desde ese momento el sistema controla su stock.</p>
+        <a class="btn grande" href="/sede/conteo-inicial">Registrar conteo inicial</a>
+    </div>
+
+    <div id="con-control" hidden>
+        <a class="btn grande" href="/sede/consumo">Registrar consumo del turno</a>
+        <h3>Envíos por confirmar</h3>
+        <div id="envios"></div>
+        <h3>Stock de mi sede</h3>
+        <div class="tabla-scroll"><table class="compacta" id="stock"></table></div>
+        <p class="nota">Stock = conteo inicial + envíos − consumos ± ajustes. Los envíos se cuentan desde que salen del almacén;
+            si algo no llegó, confírmelo como «llegó diferente».</p>
+    </div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// Panel del encargado de sede: envíos por confirmar (CU13) y stock calculado (RN-09)
+alCargar(async () => {
+    const u = await iniciarPagina();
+    const p = await api('GET', '/api/sede/panel');
+    $('#titulo').textContent = p.sede.nombre;
+    if (!p.control_iniciado) { $('#sin-conteo').hidden = false; return; }
+    $('#con-control').hidden = false;
+    if (p.pendientes) mensaje(`Tiene ${p.pendientes} registro(s) esperando la revisión del jefe de logística.`, 'aviso');
+    $('#envios').innerHTML = p.envios.map((e) => `<div class="envio">
+        <div><strong>Envío N.° ${e.id_movimiento}</strong> · ${fecha(e.fecha)}${e.observacion ? ` · ${h(e.observacion)}` : ''}
+            <ul>${e.detalles.map((d) => `<li>${h(d.producto)}: <strong>${num(d.cantidad)}</strong> ${h(d.unidad)}</li>`).join('')}</ul></div>
+        <div class="acciones-envio">
+            <button class="btn verde" data-conforme="${e.id_movimiento}">Sí, llegó todo</button>
+            <a class="btn gris" href="/sede/envio/${e.id_movimiento}">No, llegó diferente</a>
+        </div></div>`).join('') || '<p class="vacio">No hay envíos pendientes.</p>';
+    $('#stock').innerHTML = `<tr><th>Producto</th><th class="num">Stock</th><th class="num">Uso diario</th><th class="num">Días</th></tr>` +
+        p.stock.map((f) => `<tr class="${f.alerta ? 'reponer' : ''}"><td>${h(f.producto)}</td>
+            <td class="num">${num(f.stock_sede)} ${h(f.unidad)}</td><td class="num">${num(f.uso_diario)}</td>
+            <td class="num ${f.alerta ? 'rojo' : ''}">${f.dias_alcanza === null ? '—' : num(f.dias_alcanza)}</td></tr>`).join('');
+});
+$('#envios').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-conforme]');
+    if (!b) return;
+    try {
+        const r = await conBoton(b, () => api('PUT', `/api/sede/envios/${b.dataset.conforme}/confirmar`, { conforme: true }));
+        mensajeSiguiente(r.mensaje);
+        location.reload();
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

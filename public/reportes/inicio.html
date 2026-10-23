@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reportes | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Reportes</h2>
+    <p class="nota">Los reportes se muestran en pantalla y se imprimen o guardan en PDF con el botón «Imprimir» (Destino: Guardar como PDF).</p>
+    <div class="reportes">
+        <div class="tarjeta reporte">
+            <h3>Consumo por sede y mes</h3>
+            <p>Total despachado por el almacén a cada sede, por producto, con totales por sede.</p>
+            <a class="btn" href="/reportes/consumo-sede-mes">Abrir reporte</a>
+        </div>
+        <div class="tarjeta reporte">
+            <h3>Productos bajo el mínimo</h3>
+            <p>Productos con stock menor o igual a su stock mínimo y cuánto falta para reponer.</p>
+            <a class="btn" href="/reportes/bajo-minimo">Abrir reporte</a>
+        </div>
+    </div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>alCargar(iniciarPagina);</script>
+</body>
+</html>

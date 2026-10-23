@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Marcas | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Marcas</h2>
+        <a class="btn" href="/marcas/nuevo">+ Nueva marca</a>
+    </div>
+    <div id="mensajes"></div>
+    <table class="angosta" id="tabla"></table>
+    <p class="nota">Nada se borra: una marca se desactiva, y solo si ningún producto activo la usa (RN-10).</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU06 Gestionar productos y marcas
+async function cargar() {
+    const { marcas } = await api('GET', '/api/marcas');
+    $('#tabla').innerHTML = `<tr><th>Nombre</th><th class="num">Productos</th><th>Estado</th><th>Acciones</th></tr>` +
+        marcas.map((c) => `<tr class="${c.activo ? '' : 'inactivo'}">
+            <td>${h(c.nombre)}</td><td class="num">${c.productos}</td>
+            <td><span class="estado ${c.activo ? 'on' : 'off'}">${c.activo ? 'Activa' : 'Inactiva'}</span></td>
+            <td class="acciones"><a class="btn-sm" href="/marcas/editar/${c.id_marca}">Editar</a>
+                <button class="btn-sm gris" data-id="${c.id_marca}" data-activo="${c.activo ? 0 : 1}">${c.activo ? 'Desactivar' : 'Activar'}</button></td>
+        </tr>`).join('');
+}
+$('#tabla').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button[data-id]');
+    if (!b) return;
+    try {
+        const r = await api('PUT', `/api/marcas/${b.dataset.id}/estado`, { activo: b.dataset.activo === '1' });
+        mensaje(r.mensaje);
+        await cargar();
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => { await iniciarPagina(); await cargar(); });
+</script>
+</body>
+</html>

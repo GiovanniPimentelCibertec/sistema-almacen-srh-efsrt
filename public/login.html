@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Iniciar sesión | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="fondo-login">
+<div class="caja-login">
+    <h1>📦 Almacén SRH</h1>
+    <p class="sub">Sistema de gestión de almacén logístico<br>SRH S.A.C.</p>
+    <div id="mensajes"></div>
+    <form id="form-login">
+        <label>Usuario
+            <input name="username" autocomplete="username" required autofocus>
+        </label>
+        <label>Contraseña
+            <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn">Ingresar</button>
+    </form>
+</div>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU01 Iniciar sesión (incluye CU02 Validar credenciales en el servidor)
+$('#form-login').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const f = ev.target;
+    try {
+        const r = await conBoton(f.querySelector('button'), () =>
+            api('POST', '/api/login', { username: f.username.value.trim(), password: f.password.value }));
+        location.href = r.inicio;
+    } catch (e) {
+        mostrarError(e);
+        f.password.value = '';
+        f.password.focus();
+    }
+});
+</script>
+</body>
+</html>

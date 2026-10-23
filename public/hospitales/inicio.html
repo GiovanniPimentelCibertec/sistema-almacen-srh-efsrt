@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel de sedes | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Panel de sedes hospitalarias</h2>
+        <button class="btn gris no-imprimir" onclick="window.print()">Imprimir</button>
+    </div>
+    <div id="mensajes"></div>
+    <div class="pestanas no-imprimir" id="pestanas"></div>
+    <div id="sedes"></div>
+    <p class="nota">Uso diario = consumo de los últimos 7 días ÷ 7. Días que alcanza = stock de la sede ÷ uso diario.
+        En rojo si alcanza para 2 días o menos. Stock de la sede = conteo inicial + envíos − consumos ± ajustes (RN-09).</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU16 Ver panel de sedes (RF-12)
+let todas = [];
+function pintar(idSede) {
+    const lista = idSede ? todas.filter((s) => s.sede.id_sede === idSede) : todas;
+    $('#pestanas').innerHTML = `<a href="#" data-sede="" class="${idSede ? '' : 'activa'}">Todas</a>` +
+        todas.map((s) => `<a href="#" data-sede="${s.sede.id_sede}" class="${idSede === s.sede.id_sede ? 'activa' : ''}">${h(s.sede.nombre)}
+            ${s.pendientes ? `<span class="estado PENDIENTE">${s.pendientes}</span>` : ''}</a>`).join('');
+    $('#sedes').innerHTML = lista.map((s) => {
+        if (!s.control_iniciado) {
+            return `<div class="panel-sede"><h3>${h(s.sede.nombre)}</h3>
+                <div class="alerta aviso">Aún no registra su conteo inicial: el control de stock no ha empezado.</div></div>`;
+        }
+        const avisos = [];
+        if (s.sin_consumo_12h) avisos.push(s.ultimo_consumo ? `No registra consumo desde ${fecha(s.ultimo_consumo)} (más de 12 horas).` : 'Aún no registra ningún consumo.');
+        if (s.envios_pendientes) avisos.push(`${s.envios_pendientes} envío(s) sin confirmar.`);
+        if (s.pendientes) avisos.push(`${s.pendientes} registro(s) por revisar en «Errores».`);
+        return `<div class="panel-sede">
+            <h3>${h(s.sede.nombre)} <span class="nota">control desde ${fechaCorta(s.sede.fecha_inicio_control)}</span></h3>
+            ${avisos.map((a) => `<div class="alerta aviso">${h(a)}</div>`).join('')}
+            <div class="tabla-scroll"><table class="compacta"><tr><th>Código</th><th>Producto</th><th>Unidad</th><th class="num">Stock en sede</th>
+                <th class="num">Consumo 7 días</th><th class="num">Uso diario</th><th class="num">Días que alcanza</th></tr>
+            ${s.filas.map((f) => `<tr class="${f.alerta ? 'reponer' : ''}"><td>${h(f.codigo)}</td><td>${h(f.producto)}</td><td>${h(f.unidad)}</td>
+                <td class="num">${num(f.stock_sede)}</td><td class="num">${num(f.consumo_7_dias)}</td><td class="num">${num(f.uso_diario)}</td>
+                <td class="num ${f.alerta ? 'rojo' : ''}">${f.dias_alcanza === null ? 'sin consumo' : num(f.dias_alcanza)}</td></tr>`).join('')}
+            </table></div></div>`;
+    }).join('') || '<p class="vacio">No hay hospitales activos.</p>';
+}
+$('#pestanas').addEventListener('click', (ev) => {
+    const a = ev.target.closest('a[data-sede]');
+    if (!a) return;
+    ev.preventDefault();
+    pintar(Number(a.dataset.sede) || null);
+});
+alCargar(async () => {
+    await iniciarPagina();
+    ({ sedes: todas } = await api('GET', '/api/panel-sedes'));
+    pintar(null);
+});
+</script>
+</body>
+</html>

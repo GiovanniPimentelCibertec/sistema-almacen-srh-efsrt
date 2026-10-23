@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Detalle del movimiento | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2 id="titulo">Movimiento</h2>
+        <button class="btn gris no-imprimir" onclick="window.print()">Imprimir</button>
+    </div>
+    <div id="mensajes"></div>
+    <table class="resumen angosta" id="resumen"></table>
+    <h3>Productos</h3>
+    <table id="productos"></table>
+    <p><a class="btn-sm no-imprimir" id="volver">← Volver</a></p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+alCargar(async () => {
+    await iniciarPagina();
+    const base = location.pathname.split('/')[1];
+    $('#volver').href = `/${base}`;
+    const { movimiento: m } = await api('GET', `/api/movimientos/${idDeUrl()}`);
+    const esSalida = m.tipo === 'SALIDA';
+    $('#titulo').innerHTML = `${{ ENTRADA: 'Entrada', SALIDA: 'Salida', AJUSTE: 'Ajuste' }[m.tipo]} N.° ${m.id_movimiento}`;
+    const fila = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
+    $('#resumen').innerHTML = fila('Fecha', fecha(m.fecha)) + fila('Tipo', `<span class="etiqueta ${m.tipo}">${m.tipo}</span>`) +
+        (esSalida ? fila('Sede', h(m.sede)) + fila('Confirmación de la sede', m.tipo_sede !== 'HOSPITAL' ? 'No aplica (planta)'
+            : m.confirmado_sede ? `<span class="estado ${m.confirmado_sede}">${m.confirmado_sede}</span>` : '<span class="estado PENDIENTE">Pendiente</span>') : '') +
+        fila(m.tipo === 'AJUSTE' ? 'Motivo' : 'Observación', h(m.observacion || '—')) +
+        fila('Registró', h(m.registrado_por)) + fila('Estado', `<span class="estado ${m.estado}">${m.estado}</span>`);
+    let incompleta = false;
+    $('#productos').innerHTML = `<tr><th>Código</th><th>Producto</th><th>Unidad</th>${esSalida ? '<th class="num">Pedido</th>' : ''}
+        <th class="num">${esSalida ? 'Despachado' : m.tipo === 'AJUSTE' ? 'Diferencia' : 'Cantidad'}</th><th class="num">Saldo (kardex)</th></tr>` +
+        m.detalles.map((d) => {
+            const falta = esSalida && d.cantidad < d.cantidad_pedida;
+            incompleta = incompleta || falta;
+            return `<tr><td>${h(d.codigo)}</td><td>${h(d.producto)}</td><td>${h(d.unidad)}</td>
+                ${esSalida ? `<td class="num">${num(d.cantidad_pedida)}</td>` : ''}
+                <td class="num ${falta ? 'rojo' : ''}">${m.tipo === 'AJUSTE' && d.cantidad > 0 ? '+' : ''}${num(d.cantidad)}</td>
+                <td class="num">${num(d.stock_resultante)}</td></tr>`;
+        }).join('');
+    if (incompleta) mensaje('Entrega incompleta: se despachó menos de lo pedido en los productos marcados en rojo.', 'aviso');
+    if (m.estado === 'ANULADO') mensaje('Este movimiento está ANULADO: ya no cuenta para el stock ni para el kardex.', 'error');
+});
+</script>
+</body>
+</html>

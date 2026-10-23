@@ -1,0 +1,22 @@
+{
+  "name": "sistema-almacen-srh",
+  "version": "1.0.0",
+  "description": "Sistema web de gestión de almacén logístico para SRH S.A.C. (EFSRT I, Grupo 08). HTML5 + CSS3 + JavaScript, Node.js y MySQL.",
+  "main": "src/app.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "demo": "node database/cargar_datos_demo.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "2.4.3",
+    "dotenv": "16.4.5",
+    "express": "4.21.1",
+    "express-session": "1.18.1",
+    "mysql2": "3.11.3"
+  }
+}

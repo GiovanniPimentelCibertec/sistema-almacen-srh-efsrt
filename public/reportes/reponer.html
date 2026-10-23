@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Productos bajo el mínimo | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Reporte de productos bajo el mínimo</h2>
+        <button class="btn gris no-imprimir" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+    <div class="cabecera-reporte"><strong>SRH S.A.C. · Almacén central Planta Callao</strong><br><span id="sub"></span></div>
+    <div id="mensajes"></div>
+    <table id="tabla"></table>
+    <p class="nota">Stock mínimo = (salidas de los últimos 90 días ÷ 90) × días de reposición; sin salidas, el mínimo inicial (RN-07).</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU11 Generar reportes (vista v_bajo_minimo)
+alCargar(async () => {
+    await iniciarPagina();
+    const { productos } = await api('GET', '/api/reportes/bajo-minimo');
+    $('#sub').textContent = `Generado el ${new Date().toLocaleString('es-PE')} · ${productos.length} producto(s) por reponer`;
+    $('#tabla').innerHTML = `<tr><th>Código</th><th>Producto</th><th>Unidad</th><th class="num">Stock</th><th class="num">Stock mínimo</th><th class="num">Falta</th></tr>` +
+        (productos.map((p) => `<tr class="reponer"><td>${h(p.codigo)}</td><td>${h(p.nombre)}</td><td>${h(p.unidad)}</td>
+            <td class="num rojo">${num(p.stock)}</td><td class="num">${num(p.stock_minimo)}</td><td class="num">${num(p.falta)}</td></tr>`).join('')
+        || '<tr><td colspan="6">Ningún producto está por debajo de su mínimo.</td></tr>');
+});
+</script>
+</body>
+</html>

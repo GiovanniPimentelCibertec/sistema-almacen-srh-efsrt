@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ajustes | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Ajustes por conteo físico</h2>
+        <a class="btn" href="/ajustes/nuevo">+ Nuevo ajuste</a>
+    </div>
+    <div id="mensajes"></div>
+    <div class="tabla-scroll"><table id="tabla"></table></div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU09 Registrar ajuste (solo el jefe de logística)
+alCargar(async () => {
+    await iniciarPagina();
+    const { movimientos } = await api('GET', '/api/movimientos?tipo=AJUSTE');
+    const filas = [];
+    for (const m of movimientos) {
+        const { movimiento } = await api('GET', `/api/movimientos/${m.id_movimiento}`);
+        const d = movimiento.detalles[0];
+        filas.push(`<tr class="${m.estado === 'ANULADO' ? 'anulado' : ''}"><td>${m.id_movimiento}</td><td>${fecha(m.fecha)}</td>
+            <td>${h(d.codigo)} ${h(d.producto)}</td><td class="num ${d.cantidad < 0 ? 'rojo' : ''}">${d.cantidad > 0 ? '+' : ''}${num(d.cantidad)}</td>
+            <td class="num">${num(d.stock_resultante)}</td><td>${h(m.observacion)}</td><td>${h(m.registrado_por)}</td>
+            <td><a class="btn-sm" href="/movimientos/${m.id_movimiento}">Ver</a></td></tr>`);
+    }
+    $('#tabla').innerHTML = `<tr><th>N.°</th><th>Fecha</th><th>Producto</th><th class="num">Diferencia</th><th class="num">Stock final</th>
+        <th>Motivo</th><th>Registró</th><th></th></tr>` + (filas.join('') || '<tr><td colspan="8">Aún no hay ajustes.</td></tr>');
+});
+</script>
+</body>
+</html>

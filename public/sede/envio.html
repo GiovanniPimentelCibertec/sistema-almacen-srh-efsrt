@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confirmar envío | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="sede">
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Envío</h2>
+    <p class="nota">Escriba cuánto llegó de cada producto (0 si no llegó nada). Lo que no coincida quedará pendiente para el jefe de logística.</p>
+    <div id="mensajes"></div>
+    <form class="formulario ancho" id="form">
+        <table class="detalle"><thead><tr><th>Producto</th><th class="num">Enviado</th><th>Llegó</th></tr></thead>
+            <tbody id="filas"></tbody></table>
+        <div class="botones">
+            <button class="btn grande" type="submit">Confirmar lo que llegó</button>
+            <a class="btn gris" href="/sede">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU13 Confirmar envío recibido: «No, llegó diferente» (HU-05)
+const id = idDeUrl();
+alCargar(async () => {
+    await iniciarPagina();
+    const { envio } = await api('GET', `/api/sede/envios/${id}`);
+    $('#titulo').textContent = `Envío N.° ${envio.id_movimiento} · ${fecha(envio.fecha)}`;
+    if (envio.confirmado_sede) {
+        mensaje(`Este envío ya fue confirmado como ${envio.confirmado_sede}.`, 'aviso');
+        $('#form').hidden = true;
+        return;
+    }
+    $('#filas').innerHTML = envio.detalles.map((d) => `<tr><td>${h(d.producto)}</td><td class="num">${num(d.cantidad)} ${h(d.unidad)}</td>
+        <td><input class="corto" type="number" min="0" max="${d.cantidad}" step="0.01" required value="${d.cantidad}" data-id="${d.id_producto}"></td></tr>`).join('');
+});
+$('#form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const recibidos = {};
+    document.querySelectorAll('[data-id]').forEach((i) => { recibidos[i.dataset.id] = i.value; });
+    try {
+        const r = await conBoton(ev.target.querySelector('button'), () => api('PUT', `/api/sede/envios/${id}/confirmar`, { recibidos }));
+        mensajeSiguiente(r.mensaje);
+        location.href = '/sede';
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

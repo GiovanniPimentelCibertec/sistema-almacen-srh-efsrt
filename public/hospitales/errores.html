@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Registro de errores | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Registro de errores</h2>
+    <p class="nota">Correcciones y anulaciones de las sedes y diferencias de envío. Nada se borra: cada cambio queda aquí con su motivo (RN-10, RN-11).</p>
+    <div id="mensajes"></div>
+    <form class="filtros" id="filtros">
+        <label>Sede <select name="sede"></select></label>
+        <label>Estado
+            <select name="estado"><option value="">Todos</option><option>PENDIENTE</option><option>APROBADO</option><option>RECHAZADO</option></select>
+        </label>
+        <button class="btn" type="submit">Filtrar</button>
+    </form>
+    <div class="tabla-scroll"><table id="tabla"></table></div>
+</main>
+
+<div class="dialogo" id="dialogo" hidden>
+    <form class="caja" id="form-dif">
+        <h3>Resolver diferencia de envío</h3>
+        <p id="dif-texto"></p>
+        <label><span><input type="radio" name="resolucion" value="REGISTRO" required> Se registró mal</span>
+            <em class="nota">Se anula la salida original (el almacén recupera lo enviado) y se registra otra con lo que de verdad se envió.</em></label>
+        <label><span><input type="radio" name="resolucion" value="PERDIDA"> Se perdió en el camino</span>
+            <em class="nota">Se descuenta de la sede con un ajuste; el almacén central no cambia.</em></label>
+        <div class="botones">
+            <button class="btn verde" type="submit">Aprobar</button>
+            <button class="btn gris" type="button" id="cerrar">Cancelar</button>
+        </div>
+    </form>
+</div>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU15 Aprobar correcciones (RF-11)
+const f = $('#filtros');
+const ACCION = { CORREGIR: 'Corregir cantidad', ANULAR: 'Anular registro', DIFERENCIA: 'Diferencia de envío' };
+let errores = [];
+let actual = null;
+
+async function cargar() {
+    const q = new URLSearchParams();
+    if (f.sede.value) q.set('sede', f.sede.value);
+    if (f.estado.value) q.set('estado', f.estado.value);
+    ({ errores } = await api('GET', '/api/errores?' + q));
+    $('#tabla').innerHTML = `<tr><th>Fecha</th><th>Sede</th><th>Acción</th><th>Registro</th><th class="num">Antes</th><th class="num">Después</th>
+        <th>Motivo</th><th>Reportó</th><th>Estado</th><th>Revisión</th></tr>` +
+        (errores.map((e) => `<tr>
+            <td>${fecha(e.fecha_reporte)}</td><td>${h(e.sede || '—')}</td><td>${ACCION[e.accion]}</td>
+            <td>${e.accion === 'DIFERENCIA' ? `Envío <a href="/movimientos/${e.id_movimiento}">N.° ${e.id_movimiento}</a><br><span class="nota">${h(e.detalle)}</span>`
+                : `${h(e.tipo_registro || '')} ${h(e.codigo_producto || '')} ${h(e.producto || '')}${e.detalle ? `<br><span class="nota">${h(e.detalle)}</span>` : ''}`}</td>
+            <td class="num">${num(e.valor_anterior)}</td><td class="num">${e.valor_nuevo === null ? '—' : num(e.valor_nuevo)}</td>
+            <td>${h(e.motivo)}</td><td>${h(e.reportado_por)}</td>
+            <td><span class="estado ${e.estado}">${e.estado}</span></td>
+            <td>${e.estado === 'PENDIENTE' ? `<div class="acciones"><button class="btn-sm verde" data-aprobar="${e.id_error}">Aprobar</button>
+                <button class="btn-sm rojo" data-rechazar="${e.id_error}">Rechazar</button></div>`
+                : `${h(e.revisado_por || 'automática (≤ 24 h)')}<br><span class="nota">${fecha(e.fecha_revision)}</span>`}</td>
+        </tr>`).join('') || '<tr><td colspan="10">No hay registros con ese filtro.</td></tr>');
+}
+
+async function revisar(id, accion, cuerpo = {}) {
+    try {
+        const r = await api('PUT', `/api/errores/${id}/${accion}`, cuerpo);
+        mensaje(r.mensaje);
+        await cargar();
+    } catch (e) { mostrarError(e); }
+}
+
+$('#tabla').addEventListener('click', async (ev) => {
+    const ap = ev.target.closest('[data-aprobar]');
+    const re = ev.target.closest('[data-rechazar]');
+    if (re && confirm('¿Rechazar? No se cambiará nada.')) return revisar(re.dataset.rechazar, 'rechazar');
+    if (!ap) return;
+    actual = errores.find((e) => e.id_error === Number(ap.dataset.aprobar));
+    if (actual.accion === 'DIFERENCIA') {
+        $('#dif-texto').textContent = `${actual.sede} · envío N.° ${actual.id_movimiento}: ${actual.detalle}.`;
+        $('#form-dif').reset();
+        $('#dialogo').hidden = false;
+    } else if (confirm('¿Aprobar y aplicar este cambio en el registro de la sede?')) {
+        await revisar(actual.id_error, 'aprobar');
+    }
+});
+$('#cerrar').addEventListener('click', () => { $('#dialogo').hidden = true; });
+$('#form-dif').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    $('#dialogo').hidden = true;
+    await revisar(actual.id_error, 'aprobar', { resolucion: ev.target.resolucion.value });
+});
+f.addEventListener('submit', async (ev) => { ev.preventDefault(); try { await cargar(); } catch (e) { mostrarError(e); } });
+
+alCargar(async () => {
+    await iniciarPagina();
+    const { sedes } = await api('GET', '/api/sedes');
+    llenarSelect(f.sede, sedes.filter((s) => s.tipo === 'HOSPITAL'), 'id_sede', 'nombre', 'Todas');
+    if (param('estado')) f.estado.value = param('estado');
+    await cargar();
+});
+</script>
+</body>
+</html>

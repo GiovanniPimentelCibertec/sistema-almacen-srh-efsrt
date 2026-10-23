@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Productos | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Productos</h2>
+        <a class="btn" href="/productos/nuevo" id="btn-nuevo" hidden>+ Nuevo producto</a>
+    </div>
+    <div id="mensajes"></div>
+    <div class="filtros">
+        <label>Buscar <input id="buscar" placeholder="Código o nombre"></label>
+        <label>Categoría <select id="categoria"></select></label>
+    </div>
+    <div class="tabla-scroll"><table id="tabla"></table></div>
+    <p class="nota">El stock solo cambia con entradas, salidas y ajustes. El stock mínimo se recalcula después de cada salida (RN-07).</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU06 Gestionar productos y marcas (el asistente solo ve)
+let productos = [];
+let esJefe = false;
+
+function pintar() {
+    const texto = $('#buscar').value.trim().toLowerCase();
+    const cat = $('#categoria').value;
+    const filas = productos.filter((p) => (!cat || p.categoria === cat) &&
+        (!texto || p.codigo.toLowerCase().includes(texto) || p.nombre.toLowerCase().includes(texto)));
+    $('#tabla').innerHTML = `<tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Marca</th><th>Unidad</th>
+        <th class="num">Stock</th><th class="num">Mínimo</th><th>Situación</th><th>Estado</th>${esJefe ? '<th>Acciones</th>' : ''}</tr>` +
+        (filas.map((p) => `<tr class="${p.activo ? '' : 'inactivo'} ${p.activo && p.situacion === 'REPONER' ? 'reponer' : ''}">
+            <td>${h(p.codigo)}</td><td>${h(p.nombre)}</td><td>${h(p.categoria)}</td><td>${h(p.marca || '—')}</td><td>${h(p.unidad)}</td>
+            <td class="num ${p.situacion === 'REPONER' ? 'rojo' : ''}">${num(p.stock)}</td><td class="num">${num(p.stock_minimo)}</td>
+            <td><span class="etiqueta ${p.situacion}">${p.situacion}</span></td>
+            <td><span class="estado ${p.activo ? 'on' : 'off'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+            ${esJefe ? `<td class="acciones"><a class="btn-sm" href="/productos/editar/${p.id_producto}">Editar</a>
+                <button class="btn-sm gris" data-id="${p.id_producto}" data-activo="${p.activo ? 0 : 1}">${p.activo ? 'Desactivar' : 'Activar'}</button></td>` : ''}
+        </tr>`).join('') || `<tr><td colspan="10">No hay productos con ese filtro.</td></tr>`);
+}
+async function cargar() {
+    ({ productos } = await api('GET', '/api/productos'));
+    pintar();
+}
+$('#buscar').addEventListener('input', pintar);
+$('#categoria').addEventListener('change', pintar);
+$('#tabla').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button[data-id]');
+    if (!b) return;
+    try {
+        const r = await api('PUT', `/api/productos/${b.dataset.id}/estado`, { activo: b.dataset.activo === '1' });
+        mensaje(r.mensaje);
+        await cargar();
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => {
+    const u = await iniciarPagina();
+    esJefe = u.rol === 'JEFE';
+    $('#btn-nuevo').hidden = !esJefe;
+    const { categorias } = await api('GET', '/api/categorias');
+    llenarSelect($('#categoria'), categorias, 'nombre', 'nombre', 'Todas');
+    await cargar();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Usuarios | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Usuarios</h2>
+        <a class="btn" href="/usuarios/nuevo">+ Nuevo usuario</a>
+    </div>
+    <div id="mensajes"></div>
+    <div class="tabla-scroll"><table id="tabla"></table></div>
+    <p class="nota">Nada se borra: un usuario desactivado ya no puede iniciar sesión (RN-10).</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU03 Gestionar usuarios
+async function cargar() {
+    const { usuarios } = await api('GET', '/api/usuarios');
+    $('#tabla').innerHTML = `<tr><th>Usuario</th><th>Nombres</th><th>Rol</th><th>Sede</th><th>Estado</th><th>Acciones</th></tr>` +
+        usuarios.map((u) => `<tr class="${u.activo ? '' : 'inactivo'}">
+            <td>${h(u.username)}</td><td>${h(u.nombres)}</td><td>${h(u.rol)}</td><td>${h(u.sede || '—')}</td>
+            <td><span class="estado ${u.activo ? 'on' : 'off'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+            <td class="acciones"><a class="btn-sm" href="/usuarios/editar/${u.id_usuario}">Editar</a>
+                <button class="btn-sm gris" data-id="${u.id_usuario}" data-activo="${u.activo ? 0 : 1}">${u.activo ? 'Desactivar' : 'Activar'}</button></td>
+        </tr>`).join('');
+}
+$('#tabla').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button[data-id]');
+    if (!b) return;
+    try {
+        const r = await api('PUT', `/api/usuarios/${b.dataset.id}/estado`, { activo: b.dataset.activo === '1' });
+        mensaje(r.mensaje);
+        await cargar();
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => { await iniciarPagina(); await cargar(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Producto | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Nuevo producto</h2>
+    <div id="mensajes"></div>
+    <form class="formulario dos" id="form">
+        <label>Código <em>único; no se cambia después (RN-01)</em>
+            <input name="codigo" maxlength="20" required placeholder="BOL-003"></label>
+        <label>Nombre <input name="nombre" maxlength="100" required></label>
+        <label>Categoría <select name="id_categoria" required></select></label>
+        <label>Marca <em>opcional</em> <select name="id_marca"></select></label>
+        <label>Unidad <input name="unidad" maxlength="20" required list="unidades" placeholder="unidad, caja, galón...">
+            <datalist id="unidades"><option>unidad</option><option>caja</option><option>paquete</option><option>galón</option><option>kg</option><option>rollo</option></datalist>
+        </label>
+        <label>Días de reposición <em>lo que tarda en llegar una compra</em>
+            <input name="dias_reposicion" type="number" min="1" max="365" step="1" value="7" required></label>
+        <label>Stock mínimo inicial <em>se usa mientras no haya salidas (RN-02, RN-07)</em>
+            <input name="minimo_inicial" type="number" min="0" step="0.01" required></label>
+        <label>Stock actual <em>empieza en 0 y solo cambia con movimientos</em>
+            <input id="stock" value="0" disabled></label>
+        <div class="botones">
+            <button class="btn" type="submit">Guardar</button>
+            <a class="btn gris" href="/productos">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const id = idDeUrl();
+const f = $('#form');
+alCargar(async () => {
+    await iniciarPagina();
+    const [{ categorias }, { marcas }] = await Promise.all([api('GET', '/api/categorias?activos=1'), api('GET', '/api/marcas?activos=1')]);
+    llenarSelect(f.id_categoria, categorias, 'id_categoria', 'nombre');
+    llenarSelect(f.id_marca, marcas, 'id_marca', 'nombre', 'Sin marca');
+    if (id) {
+        $('#titulo').textContent = 'Editar producto';
+        const { item } = await api('GET', `/api/productos/${id}`);
+        f.codigo.value = item.codigo;
+        f.codigo.disabled = true;
+        f.nombre.value = item.nombre;
+        f.unidad.value = item.unidad;
+        f.id_categoria.value = item.id_categoria;
+        f.id_marca.value = item.id_marca || '';
+        f.dias_reposicion.value = item.dias_reposicion;
+        f.minimo_inicial.value = item.minimo_inicial;
+        $('#stock').value = `${num(item.stock)} (mínimo actual ${num(item.stock_minimo)})`;
+    }
+});
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const datos = {
+        codigo: f.codigo.value, nombre: f.nombre.value, unidad: f.unidad.value, id_categoria: f.id_categoria.value,
+        id_marca: f.id_marca.value, dias_reposicion: f.dias_reposicion.value, minimo_inicial: f.minimo_inicial.value,
+    };
+    try {
+        const r = await conBoton(f.querySelector('button'), () =>
+            id ? api('PUT', `/api/productos/${id}`, datos) : api('POST', '/api/productos', datos));
+        mensajeSiguiente(r.mensaje);
+        location.href = '/productos';
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

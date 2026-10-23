@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nuevo ajuste | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Nuevo ajuste por conteo físico</h2>
+    <div id="mensajes"></div>
+    <form class="formulario" id="form">
+        <label>Producto <select name="id_producto" required></select></label>
+        <label>Stock en el sistema <input id="stock" disabled></label>
+        <label>Cantidad que hay físicamente <em>lo que se contó en el almacén</em>
+            <input name="cantidad_fisica" type="number" min="0" step="0.01" required></label>
+        <p class="nota" id="diferencia"></p>
+        <label>Motivo <em>obligatorio (por ejemplo: conteo mensual, producto dañado)</em>
+            <input name="motivo" maxlength="200" required></label>
+        <div class="botones">
+            <button class="btn" type="submit">Registrar ajuste</button>
+            <a class="btn gris" href="/ajustes">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU09 · HU-04: el stock queda igual al conteo y se guarda la diferencia con su motivo
+const f = $('#form');
+let productos = [];
+const actual = () => productos.find((p) => p.id_producto === Number(f.id_producto.value));
+function mostrarDiferencia() {
+    const p = actual();
+    $('#stock').value = p ? `${num(p.stock)} ${p.unidad}` : '';
+    const fisica = f.cantidad_fisica.value;
+    if (!p || fisica === '') { $('#diferencia').textContent = ''; return; }
+    const dif = Math.round((Number(fisica) - Number(p.stock)) * 100) / 100;
+    $('#diferencia').textContent = dif === 0 ? 'Coincide con el sistema: no hace falta ajuste.'
+        : `Se registrará un ajuste de ${dif > 0 ? '+' : ''}${num(dif)} ${p.unidad}.`;
+}
+f.id_producto.addEventListener('change', mostrarDiferencia);
+f.cantidad_fisica.addEventListener('input', mostrarDiferencia);
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+        const r = await conBoton(f.querySelector('button'), () => api('POST', '/api/movimientos/ajuste', {
+            id_producto: f.id_producto.value, cantidad_fisica: f.cantidad_fisica.value, motivo: f.motivo.value,
+        }));
+        mensajeSiguiente(r.mensaje + (r.alertas.length ? ' ⚠ El producto quedó por reponer.' : ''));
+        location.href = '/ajustes';
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => {
+    await iniciarPagina();
+    ({ productos } = await api('GET', '/api/productos?activos=1'));
+    llenarSelect(f.id_producto, productos, 'id_producto', (p) => `${p.codigo} · ${p.nombre}`);
+});
+</script>
+</body>
+</html>

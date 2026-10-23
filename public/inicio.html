@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inicio | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="saludo">Inicio</h2>
+    <div id="mensajes"></div>
+    <div class="tarjetas" id="tarjetas"></div>
+
+    <h3>Productos por reponer</h3>
+    <p class="nota">Stock menor o igual al stock mínimo (RN-08).</p>
+    <div id="reponer"></div>
+
+    <h3>Últimos movimientos</h3>
+    <div id="ultimos"></div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+alCargar(async () => {
+    const u = await iniciarPagina();
+    $('#saludo').textContent = `Hola, ${u.nombres}`;
+    const d = await api('GET', '/api/panel');
+    const t = d.totales;
+    const tarjetas = [
+        ['Productos activos', t.productos, u.rol !== 'ADMINISTRADOR' ? '/productos' : null],
+        ['Sedes activas', t.sedes, u.rol === 'ADMINISTRADOR' ? '/sedes' : null],
+        ['Movimientos registrados', t.movimientos, u.rol !== 'ADMINISTRADOR' ? '/movimientos' : null],
+        ['Por reponer', d.reponer.length, u.rol !== 'ADMINISTRADOR' ? '/stock?situacion=REPONER' : null, 'alerta-t'],
+    ];
+    if (u.rol === 'JEFE') tarjetas.push(['Errores pendientes', t.errores_pendientes, '/errores?estado=PENDIENTE', t.errores_pendientes ? 'alerta-t' : '']);
+    if (u.rol === 'ADMINISTRADOR') tarjetas.push(['Usuarios activos', t.usuarios, '/usuarios']);
+    $('#tarjetas').className = 'tarjetas' + (tarjetas.length > 4 ? ' cinco' : '');
+    $('#tarjetas').innerHTML = tarjetas.map(([texto, valor, url, clase]) =>
+        `<div class="tarjeta ${clase || ''}">${h(texto)}<span>${num(valor)}</span>${url ? `<a href="${url}">Ver detalle →</a>` : ''}</div>`).join('');
+
+    $('#reponer').innerHTML = d.reponer.length ? `
+        <table><tr><th>Código</th><th>Producto</th><th>Unidad</th><th class="num">Stock</th><th class="num">Mínimo</th><th class="num">Falta</th></tr>
+        ${d.reponer.map((p) => `<tr class="reponer"><td>${h(p.codigo)}</td><td>${h(p.nombre)}</td><td>${h(p.unidad)}</td>
+            <td class="num rojo">${num(p.stock)}</td><td class="num">${num(p.stock_minimo)}</td><td class="num">${num(p.falta)}</td></tr>`).join('')}
+        </table>` : '<p class="vacio">Ningún producto está por debajo de su mínimo.</p>';
+
+    $('#ultimos').innerHTML = d.ultimos.length ? `
+        <table><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Sede</th><th class="num">Cantidad</th><th class="num">Saldo</th><th>Registró</th></tr>
+        ${d.ultimos.map((m) => `<tr><td>${fecha(m.fecha)}</td><td><span class="etiqueta ${m.tipo}">${m.tipo}</span></td>
+            <td>${h(m.codigo)} ${h(m.producto)}</td><td>${h(m.sede || '—')}</td><td class="num">${num(m.cantidad)}</td>
+            <td class="num">${num(m.stock_resultante)}</td><td>${h(m.registrado_por)}</td></tr>`).join('')}
+        </table>` : '<p class="vacio">Aún no hay movimientos.</p>';
+});
+</script>
+</body>
+</html>

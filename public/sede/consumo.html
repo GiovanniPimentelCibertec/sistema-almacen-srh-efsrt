@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Registrar consumo | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="sede">
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Registrar consumo del turno</h2>
+    <div id="mensajes"></div>
+    <form class="formulario" id="form">
+        <label>Producto <select name="id_producto" required></select></label>
+        <p class="nota" id="hay"></p>
+        <label>Cantidad usada <input name="cantidad" type="number" min="0.01" step="0.01" required inputmode="decimal"></label>
+        <label>Turno <em>se propone según la hora</em>
+            <select name="turno" required><option>MAÑANA</option><option>TARDE</option><option>NOCHE</option></select></label>
+        <div class="botones">
+            <button class="btn grande" type="submit">Guardar consumo</button>
+            <a class="btn gris" href="/sede">Volver</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU12 Registrar consumo (HU-06): no puede pasar el stock de la sede; avisa si se repite en menos de 10 minutos
+const f = $('#form');
+let stock = [];
+function mostrarHay() {
+    const s = stock.find((x) => x.id_producto === Number(f.id_producto.value));
+    $('#hay').textContent = s ? `En la sede hay ${num(s.stock_sede)} ${s.unidad}.` : '';
+}
+async function guardar(confirmar) {
+    return api('POST', '/api/sede/consumo', { id_producto: f.id_producto.value, cantidad: f.cantidad.value, turno: f.turno.value, confirmar });
+}
+f.id_producto.addEventListener('change', mostrarHay);
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const boton = f.querySelector('button');
+    try {
+        let r;
+        try {
+            r = await conBoton(boton, () => guardar(false));
+        } catch (e) {
+            if (e.status !== 409 || !e.datos || !/otro consumo/.test(e.message)) throw e;
+            if (!confirm(e.message)) return;
+            r = await conBoton(boton, () => guardar(true));
+        }
+        mensaje(r.mensaje);
+        f.cantidad.value = '';
+        ({ stock } = await api('GET', '/api/sede/stock'));
+        mostrarHay();
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => {
+    await iniciarPagina();
+    const p = await api('GET', '/api/sede/panel');
+    if (!p.control_iniciado) { location.href = '/sede'; return; }
+    stock = p.stock;
+    llenarSelect(f.id_producto, stock, 'id_producto', (s) => `${s.producto} (${s.unidad})`);
+    f.turno.value = (await api('GET', '/api/sede/turno')).turno;
+});
+</script>
+</body>
+</html>

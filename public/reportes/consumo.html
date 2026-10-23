@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Consumo por sede y mes | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Reporte de consumo por sede y mes</h2>
+        <button class="btn gris no-imprimir" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+    <div class="cabecera-reporte"><strong>SRH S.A.C. · Almacén central Planta Callao</strong><br><span id="sub"></span></div>
+    <div id="mensajes"></div>
+    <form class="filtros" id="filtros">
+        <label>Mes <input type="month" name="mes" required></label>
+        <label>Sede <select name="sede"></select></label>
+        <button class="btn" type="submit">Generar</button>
+    </form>
+    <div id="resultado"></div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU11 Generar reportes (vista v_despacho_sede_mes)
+const f = $('#filtros');
+async function generar() {
+    const q = new URLSearchParams({ mes: f.mes.value });
+    if (f.sede.value) q.set('sede', f.sede.value);
+    const r = await api('GET', '/api/reportes/consumo-sede-mes?' + q);
+    $('#sub').textContent = `Mes ${r.mes}${r.sede ? ' · ' + r.sede : ''} · generado el ${new Date().toLocaleString('es-PE')}`;
+    const sedes = [...new Set(r.filas.map((x) => x.sede))];
+    $('#resultado').innerHTML = sedes.map((s) => `<h3>${h(s)}</h3>
+        <table><tr><th>Código</th><th>Producto</th><th class="num">Total despachado</th></tr>
+        ${r.filas.filter((x) => x.sede === s).map((x) => `<tr><td>${h(x.codigo)}</td><td>${h(x.producto)}</td><td class="num">${num(x.total_despachado)}</td></tr>`).join('')}
+        <tr><th colspan="2">Total ${h(s)}</th><th class="num">${num(r.totales[s])}</th></tr></table>`).join('')
+        || '<p class="vacio">No hubo despachos en ese mes.</p>';
+}
+f.addEventListener('submit', async (ev) => { ev.preventDefault(); limpiarMensaje(); try { await generar(); } catch (e) { mostrarError(e); } });
+alCargar(async () => {
+    await iniciarPagina();
+    const { sedes } = await api('GET', '/api/sedes');
+    llenarSelect(f.sede, sedes, 'nombre', 'nombre', 'Todas');
+    f.mes.value = hoy().slice(0, 7);
+    await generar();
+});
+</script>
+</body>
+</html>

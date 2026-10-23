@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Movimientos | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2 id="titulo">Historial de movimientos</h2>
+        <a class="btn" id="btn-nuevo" hidden></a>
+    </div>
+    <div id="mensajes"></div>
+    <form class="filtros" id="filtros">
+        <label id="f-tipo">Tipo
+            <select name="tipo"><option value="">Todos</option><option>ENTRADA</option><option>SALIDA</option><option>AJUSTE</option></select>
+        </label>
+        <label id="f-sede">Sede <select name="sede"></select></label>
+        <label>Desde <input type="date" name="desde"></label>
+        <label>Hasta <input type="date" name="hasta"></label>
+        <button class="btn" type="submit">Filtrar</button>
+    </form>
+    <div class="tabla-scroll"><table id="tabla"></table></div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// Listas de entradas y salidas, e historial de movimientos (consulta del informe EFSRT, sección 8)
+const base = location.pathname.split('/')[1];              // entradas | salidas | movimientos
+const TIPO = { entradas: 'ENTRADA', salidas: 'SALIDA' }[base] || '';
+const f = $('#filtros');
+
+async function cargar() {
+    const q = new URLSearchParams();
+    const tipo = TIPO || f.tipo.value;
+    if (tipo) q.set('tipo', tipo);
+    for (const k of ['sede', 'desde', 'hasta']) if (f[k].value) q.set(k, f[k].value);
+    const { movimientos } = await api('GET', '/api/movimientos?' + q);
+    const conSede = tipo !== 'ENTRADA' && tipo !== 'AJUSTE';
+    $('#tabla').innerHTML = `<tr><th>N.°</th><th>Fecha</th><th>Tipo</th>${conSede ? '<th>Sede</th><th>Confirmación</th>' : ''}
+        <th>Observación</th><th class="num">Productos</th><th class="num">Unidades</th><th>Registró</th><th>Estado</th><th></th></tr>` +
+        (movimientos.map((m) => `<tr class="${m.estado === 'ANULADO' ? 'anulado' : ''}">
+            <td>${m.id_movimiento}</td><td>${fecha(m.fecha)}</td><td><span class="etiqueta ${m.tipo}">${m.tipo}</span></td>
+            ${conSede ? `<td>${h(m.sede || '—')}</td><td>${m.tipo !== 'SALIDA' ? '—' : m.tipo_sede !== 'HOSPITAL' ? 'No aplica'
+                : m.confirmado_sede ? `<span class="estado ${m.confirmado_sede}">${m.confirmado_sede}</span>` : '<span class="estado PENDIENTE">Pendiente</span>'}</td>` : ''}
+            <td>${h(m.observacion || '')}</td><td class="num">${m.productos}</td><td class="num">${num(m.unidades)}</td>
+            <td>${h(m.registrado_por)}</td><td><span class="estado ${m.estado}">${m.estado}</span></td>
+            <td><a class="btn-sm" href="/${base}/${m.id_movimiento}">Ver</a></td></tr>`).join('')
+        || '<tr><td colspan="11">No hay movimientos con ese filtro.</td></tr>');
+}
+
+f.addEventListener('submit', async (ev) => { ev.preventDefault(); try { await cargar(); } catch (e) { mostrarError(e); } });
+
+alCargar(async () => {
+    await iniciarPagina();
+    if (TIPO) {
+        $('#titulo').textContent = TIPO === 'ENTRADA' ? 'Entradas al almacén' : 'Salidas a sedes';
+        $('#btn-nuevo').hidden = false;
+        $('#btn-nuevo').href = `/${base}/nueva`;
+        $('#btn-nuevo').textContent = TIPO === 'ENTRADA' ? '+ Nueva entrada' : '+ Nueva salida';
+        $('#f-tipo').hidden = true;
+        if (TIPO === 'ENTRADA') $('#f-sede').hidden = true;
+    }
+    if (param('tipo')) f.tipo.value = param('tipo');
+    const { sedes } = await api('GET', '/api/sedes');
+    llenarSelect(f.sede, sedes, 'id_sede', 'nombre', 'Todas');
+    await cargar();
+});
+</script>
+</body>
+</html>

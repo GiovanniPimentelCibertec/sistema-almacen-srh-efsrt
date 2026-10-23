@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sedes | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Sedes</h2>
+        <a class="btn" href="/sedes/nuevo">+ Nueva sede</a>
+    </div>
+    <div id="mensajes"></div>
+    <table id="tabla"></table>
+    <p class="nota">Un hospital empieza a controlar su stock cuando su encargado registra el conteo inicial.</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU04 Gestionar sedes
+async function cargar() {
+    const { sedes } = await api('GET', '/api/sedes');
+    $('#tabla').innerHTML = `<tr><th>Nombre</th><th>Tipo</th><th>Inicio del control</th><th>Estado</th><th>Acciones</th></tr>` +
+        sedes.map((s) => `<tr class="${s.activo ? '' : 'inactivo'}">
+            <td>${h(s.nombre)}</td><td>${h(s.tipo)}</td>
+            <td>${s.tipo === 'HOSPITAL' ? (s.fecha_inicio_control ? fechaCorta(s.fecha_inicio_control) : 'Falta el conteo inicial') : '—'}</td>
+            <td><span class="estado ${s.activo ? 'on' : 'off'}">${s.activo ? 'Activa' : 'Inactiva'}</span></td>
+            <td class="acciones"><a class="btn-sm" href="/sedes/editar/${s.id_sede}">Editar</a>
+                <button class="btn-sm gris" data-id="${s.id_sede}" data-activo="${s.activo ? 0 : 1}">${s.activo ? 'Desactivar' : 'Activar'}</button></td>
+        </tr>`).join('');
+}
+$('#tabla').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button[data-id]');
+    if (!b) return;
+    try {
+        const r = await api('PUT', `/api/sedes/${b.dataset.id}/estado`, { activo: b.dataset.activo === '1' });
+        mensaje(r.mensaje);
+        await cargar();
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => { await iniciarPagina(); await cargar(); });
+</script>
+</body>
+</html>

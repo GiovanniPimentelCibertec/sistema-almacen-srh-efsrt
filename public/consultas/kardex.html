@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kardex | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Kardex por producto</h2>
+        <button class="btn gris no-imprimir" onclick="window.print()">Imprimir</button>
+    </div>
+    <div class="cabecera-reporte"><strong>SRH S.A.C. · Almacén central Planta Callao</strong></div>
+    <div id="mensajes"></div>
+    <form class="filtros" id="filtros">
+        <label>Producto <select name="producto" required></select></label>
+        <label>Desde <input type="date" name="desde" required></label>
+        <label>Hasta <input type="date" name="hasta" required></label>
+        <button class="btn" type="submit">Consultar</button>
+    </form>
+    <div id="resultado"></div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU10 Consultar kardex (vista v_kardex: solo movimientos activos)
+const f = $('#filtros');
+async function consultar() {
+    const q = new URLSearchParams({ producto: f.producto.value, desde: f.desde.value, hasta: f.hasta.value });
+    const k = await api('GET', '/api/kardex?' + q);
+    const p = k.producto;
+    $('#resultado').innerHTML = `
+        <h3>${h(p.codigo)} · ${h(p.nombre)} <span class="nota">(${h(p.unidad)})</span></h3>
+        <p class="nota">Del ${fechaCorta(k.desde)} al ${fechaCorta(k.hasta)} · Stock actual ${num(p.stock)} · Mínimo ${num(p.stock_minimo)}</p>
+        <div class="tarjetas tres">
+            <div class="tarjeta">Entradas del periodo<span>${num(k.entradas)}</span></div>
+            <div class="tarjeta">Salidas del periodo<span>${num(k.salidas)}</span></div>
+            <div class="tarjeta">Movimientos<span>${k.filas.length}</span></div>
+        </div>
+        <table><tr><th>Fecha</th><th>N.°</th><th>Tipo</th><th>Sede</th><th>Observación</th><th class="num">Entrada</th><th class="num">Salida</th><th class="num">Saldo</th><th>Registró</th></tr>
+        <tr class="saldo-inicial"><td colspan="7">Saldo al inicio del periodo</td><td class="num">${num(k.saldoInicial)}</td><td></td></tr>
+        ${k.filas.map((m) => {
+            const entra = m.tipo !== 'SALIDA' && m.cantidad > 0;
+            return `<tr><td>${fecha(m.fecha)}</td><td><a href="/movimientos/${m.id_movimiento}">${m.id_movimiento}</a></td>
+                <td><span class="etiqueta ${m.tipo}">${m.tipo}</span></td><td>${h(m.sede || '—')}</td><td>${h(m.observacion || '')}</td>
+                <td class="num">${entra ? num(m.cantidad) : ''}</td><td class="num">${entra ? '' : num(Math.abs(m.cantidad))}</td>
+                <td class="num">${num(m.stock_resultante)}</td><td>${h(m.registrado_por)}</td></tr>`;
+        }).join('') || '<tr><td colspan="9">Sin movimientos en el periodo.</td></tr>'}
+        </table>`;
+}
+f.addEventListener('submit', async (ev) => { ev.preventDefault(); limpiarMensaje(); try { await consultar(); } catch (e) { mostrarError(e); } });
+alCargar(async () => {
+    await iniciarPagina();
+    const { productos } = await api('GET', '/api/productos');
+    llenarSelect(f.producto, productos, 'id_producto', (p) => `${p.codigo} · ${p.nombre}`);
+    f.desde.value = haceDias(30);
+    f.hasta.value = hoy();
+    if (param('producto')) { f.producto.value = param('producto'); await consultar(); }
+});
+</script>
+</body>
+</html>

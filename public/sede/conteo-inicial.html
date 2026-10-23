@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Conteo inicial | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="sede">
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Conteo inicial de la sede</h2>
+    <p class="nota">Se registra una sola vez. Escriba cuánto hay de cada producto (deje vacío o 0 si no hay).
+        Los envíos anteriores a hoy no se cuentan.</p>
+    <div id="mensajes"></div>
+    <form class="formulario ancho" id="form">
+        <table class="detalle"><thead><tr><th>Producto</th><th>Unidad</th><th>Cantidad contada</th></tr></thead>
+            <tbody id="filas"></tbody></table>
+        <div class="botones">
+            <button class="btn grande" type="submit">Guardar conteo inicial</button>
+            <a class="btn gris" href="/sede">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU12 Registrar conteo (conteo inicial, una sola vez)
+alCargar(async () => {
+    await iniciarPagina();
+    const p = await api('GET', '/api/sede/panel');
+    if (p.control_iniciado) {
+        mensajeSiguiente(`El conteo inicial ya se registró el ${fechaCorta(p.sede.fecha_inicio_control)}. Use el conteo de verificación.`);
+        location.href = '/sede/verificacion';
+        return;
+    }
+    const { productos } = await api('GET', '/api/sede/productos');
+    $('#filas').innerHTML = productos.map((x) => `<tr><td>${h(x.codigo)} · ${h(x.nombre)}</td><td>${h(x.unidad)}</td>
+        <td><input class="corto" type="number" min="0" step="0.01" data-id="${x.id_producto}"></td></tr>`).join('');
+});
+$('#form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const items = [...document.querySelectorAll('[data-id]')].map((i) => ({ id_producto: i.dataset.id, cantidad: i.value }));
+    if (!confirm('El conteo inicial se registra una sola vez. ¿Confirma las cantidades?')) return;
+    try {
+        const r = await conBoton(ev.target.querySelector('button'), () => api('POST', '/api/sede/conteo-inicial', { items }));
+        mensajeSiguiente(r.mensaje);
+        location.href = '/sede';
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

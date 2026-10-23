@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Stock actual | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <div class="titulo">
+        <h2>Stock actual del almacén central</h2>
+        <button class="btn gris no-imprimir" onclick="window.print()">Imprimir</button>
+    </div>
+    <div class="cabecera-reporte"><strong>SRH S.A.C. · Stock al <span id="fecha-reporte"></span></strong></div>
+    <div id="mensajes"></div>
+    <form class="filtros" id="filtros">
+        <label>Categoría <select name="categoria"></select></label>
+        <label>Situación
+            <select name="situacion"><option value="">Todas</option><option value="REPONER">Por reponer</option><option value="OK">OK</option></select>
+        </label>
+        <button class="btn" type="submit">Filtrar</button>
+    </form>
+    <div class="tarjetas tres" id="resumen"></div>
+    <table id="tabla"></table>
+    <p class="nota">«REPONER» cuando el stock es menor o igual al stock mínimo (RN-08).</p>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU10 Consultar stock (vista v_stock_actual)
+const f = $('#filtros');
+async function cargar() {
+    const q = new URLSearchParams();
+    if (f.categoria.value) q.set('categoria', f.categoria.value);
+    if (f.situacion.value) q.set('situacion', f.situacion.value);
+    const { productos } = await api('GET', '/api/stock?' + q);
+    const reponer = productos.filter((p) => p.situacion === 'REPONER').length;
+    $('#resumen').innerHTML = `<div class="tarjeta">Productos<span>${productos.length}</span></div>
+        <div class="tarjeta alerta-t">Por reponer<span>${reponer}</span></div><div class="tarjeta">OK<span>${productos.length - reponer}</span></div>`;
+    $('#tabla').innerHTML = `<tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Unidad</th><th class="num">Stock</th>
+        <th class="num">Stock mínimo</th><th>Situación</th><th class="no-imprimir"></th></tr>` +
+        (productos.map((p) => `<tr class="${p.situacion === 'REPONER' ? 'reponer' : ''}">
+            <td>${h(p.codigo)}</td><td>${h(p.nombre)}</td><td>${h(p.categoria)}</td><td>${h(p.unidad)}</td>
+            <td class="num ${p.situacion === 'REPONER' ? 'rojo' : ''}">${num(p.stock)}</td><td class="num">${num(p.stock_minimo)}</td>
+            <td><span class="etiqueta ${p.situacion}">${p.situacion}</span></td>
+            <td class="no-imprimir"><a class="btn-sm" href="/kardex?producto=${p.id_producto}">Kardex</a></td></tr>`).join('')
+        || '<tr><td colspan="8">No hay productos con ese filtro.</td></tr>');
+}
+f.addEventListener('submit', async (ev) => { ev.preventDefault(); try { await cargar(); } catch (e) { mostrarError(e); } });
+alCargar(async () => {
+    await iniciarPagina();
+    $('#fecha-reporte').textContent = new Date().toLocaleString('es-PE');
+    const { categorias } = await api('GET', '/api/categorias');
+    llenarSelect(f.categoria, categorias, 'nombre', 'nombre', 'Todas');
+    if (param('situacion')) f.situacion.value = param('situacion');
+    await cargar();
+});
+</script>
+</body>
+</html>

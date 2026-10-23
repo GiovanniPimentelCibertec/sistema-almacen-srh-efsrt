@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nuevo movimiento | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Nueva entrada</h2>
+    <div id="mensajes"></div>
+    <form class="formulario ancho" id="form">
+        <div class="fila-dos">
+            <label id="campo-sede" hidden>Sede de destino <select name="id_sede"></select></label>
+            <label id="campo-obs">Observación <em id="ayuda-obs">n.° de guía de remisión o factura</em>
+                <input name="observacion" maxlength="200"></label>
+        </div>
+        <table class="detalle">
+            <thead id="cabecera"></thead>
+            <tbody id="lineas"></tbody>
+        </table>
+        <div>
+            <button class="btn-sm" type="button" id="agregar">+ Agregar producto</button>
+        </div>
+        <div class="botones">
+            <button class="btn" type="submit" id="guardar">Guardar</button>
+            <a class="btn gris" id="cancelar">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU07 Registrar entrada · CU08 Registrar salida a sede (todo o nada: RN-04, RN-05)
+const base = location.pathname.split('/')[1];             // entradas | salidas
+const esSalida = base === 'salidas';
+const f = $('#form');
+let productos = [];
+
+function opcionesProducto() {
+    return '<option value="">Seleccione...</option>' + productos.map((p) =>
+        `<option value="${p.id_producto}">${h(p.codigo)} · ${h(p.nombre)} (${h(p.unidad)}) — stock ${num(p.stock)}</option>`).join('');
+}
+
+function agregarLinea() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><select name="producto" required>${opcionesProducto()}</select></td>
+        ${esSalida ? '<td><input class="corto" name="pedida" type="number" min="0.01" step="0.01" required></td>' : ''}
+        <td><input class="corto" name="cantidad" type="number" min="0.01" step="0.01" required></td>
+        <td class="num" data-stock></td>
+        <td><button type="button" class="btn-sm gris" data-quitar>Quitar</button></td>`;
+    $('#lineas').appendChild(tr);
+}
+
+$('#agregar').addEventListener('click', agregarLinea);
+$('#lineas').addEventListener('click', (ev) => {
+    if (ev.target.matches('[data-quitar]') && $('#lineas').children.length > 1) ev.target.closest('tr').remove();
+});
+$('#lineas').addEventListener('change', (ev) => {
+    const tr = ev.target.closest('tr');
+    if (ev.target.name === 'producto') {
+        const p = productos.find((x) => x.id_producto === Number(ev.target.value));
+        tr.querySelector('[data-stock]').textContent = p ? `${num(p.stock)} ${p.unidad}` : '';
+    }
+    // En la salida, la cantidad despachada empieza igual a la pedida
+    if (esSalida && ev.target.name === 'pedida' && !tr.querySelector('[name=cantidad]').value) {
+        tr.querySelector('[name=cantidad]').value = ev.target.value;
+    }
+});
+
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    limpiarMensaje();
+    const lineas = [...$('#lineas').children].map((tr) => ({
+        id_producto: tr.querySelector('[name=producto]').value,
+        cantidad_pedida: esSalida ? tr.querySelector('[name=pedida]').value : undefined,
+        cantidad: tr.querySelector('[name=cantidad]').value,
+    }));
+    const datos = { observacion: f.observacion.value, lineas };
+    if (esSalida) datos.id_sede = f.id_sede.value;
+    try {
+        const r = await conBoton($('#guardar'), () => api('POST', `/api/movimientos/${esSalida ? 'salida' : 'entrada'}`, datos));
+        let texto = r.mensaje;
+        if (r.alertas && r.alertas.length) {
+            texto += ' ⚠ Por reponer: ' + r.alertas.map((a) => `${a.codigo} (stock ${num(a.stock)}, mínimo ${num(a.stock_minimo)})`).join(', ') + '.';
+        }
+        if (r.pendiente_confirmar) texto += ' El envío queda pendiente de confirmar por la sede.';
+        mensajeSiguiente(texto);
+        location.href = `/${base}/${r.id_movimiento}`;
+    } catch (e) { mostrarError(e); }
+});
+
+alCargar(async () => {
+    await iniciarPagina();
+    $('#cancelar').href = `/${base}`;
+    if (esSalida) {
+        $('#titulo').textContent = 'Nueva salida a sede';
+        $('#campo-sede').hidden = false;
+        f.id_sede.required = true;
+        $('#ayuda-obs').textContent = 'opcional: n.° de pedido o nota';
+        const { sedes } = await api('GET', '/api/sedes?activos=1');
+        llenarSelect(f.id_sede, sedes, 'id_sede', (s) => `${s.nombre} (${s.tipo})`);
+    }
+    $('#cabecera').innerHTML = `<tr><th>Producto</th>${esSalida ? '<th>Pedido</th><th>Despachado</th>' : '<th>Cantidad recibida</th>'}
+        <th class="num">Stock actual</th><th></th></tr>`;
+    ({ productos } = await api('GET', '/api/productos?activos=1'));
+    agregarLinea();
+});
+</script>
+</body>
+</html>

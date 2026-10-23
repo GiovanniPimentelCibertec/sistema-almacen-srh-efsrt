@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sede | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Nueva sede</h2>
+    <div id="mensajes"></div>
+    <form class="formulario" id="form">
+        <label>Nombre <input name="nombre" maxlength="80" required></label>
+        <label>Tipo
+            <select name="tipo" required>
+                <option value="">Seleccione...</option>
+                <option value="PLANTA">PLANTA</option>
+                <option value="HOSPITAL">HOSPITAL</option>
+            </select>
+        </label>
+        <div class="botones">
+            <button class="btn" type="submit">Guardar</button>
+            <a class="btn gris" href="/sedes">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const id = idDeUrl();
+const f = $('#form');
+alCargar(async () => {
+    await iniciarPagina();
+    if (id) {
+        $('#titulo').textContent = 'Editar sede';
+        const { item } = await api('GET', `/api/sedes/${id}`);
+        f.nombre.value = item.nombre;
+        f.tipo.value = item.tipo;
+    }
+});
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const datos = { nombre: f.nombre.value, tipo: f.tipo.value };
+    try {
+        const r = await conBoton(f.querySelector('button'), () =>
+            id ? api('PUT', `/api/sedes/${id}`, datos) : api('POST', '/api/sedes', datos));
+        mensajeSiguiente(r.mensaje);
+        location.href = '/sedes';
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

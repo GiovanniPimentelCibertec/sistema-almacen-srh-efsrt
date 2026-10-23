@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mis registros | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="sede">
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Mis registros (últimos 30 días)</h2>
+    <p class="nota">Con menos de 24 horas, la corrección se aplica al momento. Con más, queda pendiente para el jefe de logística (RN-11).
+        Nada se borra: un registro anulado deja de contar, pero se conserva (RN-10).</p>
+    <div id="mensajes"></div>
+    <div class="tabla-scroll"><table class="compacta" id="tabla"></table></div>
+</main>
+
+<div class="dialogo" id="dialogo" hidden>
+    <form class="caja" id="form">
+        <h3 id="d-titulo">Corregir registro</h3>
+        <p id="d-texto" class="nota"></p>
+        <label>¿Qué desea hacer?
+            <select name="accion" required>
+                <option value="CORREGIR">Corregir la cantidad</option>
+                <option value="ANULAR">Anular el registro</option>
+            </select></label>
+        <label id="d-cantidad">Cantidad correcta <input name="cantidad_nueva" type="number" step="0.01"></label>
+        <label>Motivo
+            <select name="motivo" required>
+                <option value="DIGITACION">Error de digitación</option>
+                <option value="DUPLICADO">Registro duplicado</option>
+                <option value="PRODUCTO">Producto equivocado</option>
+                <option value="OTRO">Otro</option>
+            </select></label>
+        <label>Detalle <em>opcional</em> <textarea name="detalle" maxlength="200" rows="2"></textarea></label>
+        <div class="botones">
+            <button class="btn" type="submit">Enviar</button>
+            <button class="btn gris" type="button" id="cerrar">Cancelar</button>
+        </div>
+    </form>
+</div>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU14 Corregir o anular registro (HU-07)
+const f = $('#form');
+let registros = [];
+let actual = null;
+async function cargar() {
+    ({ registros } = await api('GET', '/api/sede/registros'));
+    $('#tabla').innerHTML = `<tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th class="num">Cantidad</th><th>Turno</th><th>Estado</th><th></th></tr>` +
+        (registros.map((r) => `<tr class="${r.estado === 'ANULADO' ? 'anulado' : ''}">
+            <td>${fecha(r.fecha)}</td><td><span class="etiqueta ${r.tipo}">${r.tipo}</span></td>
+            <td>${h(r.producto)}${r.motivo ? `<br><span class="nota">${h(r.motivo)}</span>` : ''}</td>
+            <td class="num">${r.cantidad > 0 && r.tipo === 'AJUSTE' ? '+' : ''}${num(r.cantidad)}</td><td>${h(r.turno || '—')}</td>
+            <td>${r.pendientes ? '<span class="estado PENDIENTE">Corrección pendiente</span>' : `<span class="estado ${r.estado}">${r.estado}</span>`}</td>
+            <td>${r.estado === 'ACTIVO' && !r.pendientes ? `<button class="btn-sm" data-id="${r.id_consumo}">${r.dentro_24h ? 'Corregir' : 'Pedir corrección'}</button>` : ''}</td>
+        </tr>`).join('') || '<tr><td colspan="7">Aún no hay registros.</td></tr>');
+}
+const verCantidad = () => { $('#d-cantidad').hidden = f.accion.value !== 'CORREGIR'; f.cantidad_nueva.required = f.accion.value === 'CORREGIR'; };
+f.accion.addEventListener('change', verCantidad);
+$('#tabla').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-id]');
+    if (!b) return;
+    actual = registros.find((r) => r.id_consumo === Number(b.dataset.id));
+    f.reset();
+    f.cantidad_nueva.value = actual.cantidad;
+    $('#d-titulo').textContent = actual.dentro_24h ? 'Corregir registro' : 'Pedir corrección al jefe';
+    $('#d-texto').textContent = `${actual.tipo} de ${actual.producto}: ${num(actual.cantidad)} ${actual.unidad} (${fecha(actual.fecha)}).` +
+        (actual.dentro_24h ? '' : ' Tiene más de 24 horas: el cambio se aplicará cuando el jefe lo apruebe.');
+    verCantidad();
+    $('#dialogo').hidden = false;
+});
+$('#cerrar').addEventListener('click', () => { $('#dialogo').hidden = true; });
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+        const r = await conBoton(f.querySelector('button'), () => api('PUT', `/api/sede/consumos/${actual.id_consumo}/corregir`, {
+            accion: f.accion.value, cantidad_nueva: f.cantidad_nueva.value, motivo: f.motivo.value, detalle: f.detalle.value,
+        }));
+        $('#dialogo').hidden = true;
+        mensaje(r.mensaje, r.aplicado ? 'ok' : 'aviso');
+        await cargar();
+    } catch (e) { $('#dialogo').hidden = true; mostrarError(e); }
+});
+alCargar(async () => { await iniciarPagina(); await cargar(); });
+</script>
+</body>
+</html>

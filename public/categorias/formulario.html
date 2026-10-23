@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Categoría | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Nueva categoría</h2>
+    <div id="mensajes"></div>
+    <form class="formulario" id="form">
+        <label>Nombre <input name="nombre" maxlength="60" required></label>
+        <div class="botones">
+            <button class="btn" type="submit">Guardar</button>
+            <a class="btn gris" href="/categorias">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const id = idDeUrl();
+const f = $('#form');
+alCargar(async () => {
+    await iniciarPagina();
+    if (id) {
+        $('#titulo').textContent = 'Editar categoría';
+        const { item } = await api('GET', `/api/categorias/${id}`);
+        f.nombre.value = item.nombre;
+    }
+});
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+        const datos = { nombre: f.nombre.value };
+        const r = await conBoton(f.querySelector('button'), () =>
+            id ? api('PUT', `/api/categorias/${id}`, datos) : api('POST', '/api/categorias', datos));
+        mensajeSiguiente(r.mensaje);
+        location.href = '/categorias';
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

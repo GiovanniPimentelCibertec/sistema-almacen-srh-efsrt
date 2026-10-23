@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Usuario | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+<header id="menu"></header>
+<main class="contenido">
+    <h2 id="titulo">Nuevo usuario</h2>
+    <div id="mensajes"></div>
+    <form class="formulario" id="form">
+        <label>Nombres <input name="nombres" maxlength="100" required></label>
+        <label>Usuario <em>3 a 40 caracteres: letras, números, punto o guion</em>
+            <input name="username" maxlength="40" required pattern="[A-Za-z0-9._\-]{3,40}"></label>
+        <label>Rol
+            <select name="rol" required>
+                <option value="">Seleccione...</option>
+                <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+                <option value="JEFE">JEFE de logística</option>
+                <option value="ASISTENTE">ASISTENTE de almacén</option>
+                <option value="SEDE">SEDE (encargado de hospital)</option>
+            </select>
+        </label>
+        <label id="campo-sede" hidden>Hospital <em>solo el encargado de sede lleva hospital</em>
+            <select name="id_sede"></select></label>
+        <label>Contraseña <em id="ayuda-clave">mínimo 6 caracteres</em>
+            <input name="password" type="password" minlength="6" autocomplete="new-password"></label>
+        <div class="botones">
+            <button class="btn" type="submit">Guardar</button>
+            <a class="btn gris" href="/usuarios">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const id = idDeUrl();
+const f = $('#form');
+const verSede = () => { $('#campo-sede').hidden = f.rol.value !== 'SEDE'; f.id_sede.required = f.rol.value === 'SEDE'; };
+f.rol.addEventListener('change', verSede);
+
+alCargar(async () => {
+    await iniciarPagina();
+    const { sedes } = await api('GET', '/api/sedes?activos=1');
+    llenarSelect(f.id_sede, sedes.filter((s) => s.tipo === 'HOSPITAL' && s.activo), 'id_sede', 'nombre');
+    if (id) {
+        $('#titulo').textContent = 'Editar usuario';
+        $('#ayuda-clave').textContent = 'déjela vacía para no cambiarla';
+        const { item } = await api('GET', `/api/usuarios/${id}`);
+        f.nombres.value = item.nombres;
+        f.username.value = item.username;
+        f.rol.value = item.rol;
+        f.id_sede.value = item.id_sede || '';
+    } else {
+        f.password.required = true;
+    }
+    verSede();
+});
+
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const datos = { nombres: f.nombres.value, username: f.username.value, rol: f.rol.value, id_sede: f.id_sede.value, password: f.password.value };
+    try {
+        const r = await conBoton(f.querySelector('button'), () =>
+            id ? api('PUT', `/api/usuarios/${id}`, datos) : api('POST', '/api/usuarios', datos));
+        mensajeSiguiente(r.mensaje);
+        location.href = '/usuarios';
+    } catch (e) { mostrarError(e); }
+});
+</script>
+</body>
+</html>

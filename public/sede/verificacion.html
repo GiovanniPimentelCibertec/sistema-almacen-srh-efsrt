@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Conteo de verificación | Almacén SRH</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body class="sede">
+<header id="menu"></header>
+<main class="contenido">
+    <h2>Conteo de verificación</h2>
+    <p class="nota">Cuente un producto en la sede. Si no coincide con el sistema, se registra un ajuste por la diferencia.</p>
+    <div id="mensajes"></div>
+    <form class="formulario" id="form">
+        <label>Producto <select name="id_producto" required></select></label>
+        <p class="nota" id="hay"></p>
+        <label>Cantidad contada <input name="cantidad_fisica" type="number" min="0" step="0.01" required inputmode="decimal"></label>
+        <div class="botones">
+            <button class="btn grande" type="submit">Guardar conteo</button>
+            <a class="btn gris" href="/sede">Volver</a>
+        </div>
+    </form>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+// CU12 Registrar conteo (conteo de verificación)
+const f = $('#form');
+let stock = [];
+const mostrarHay = () => {
+    const s = stock.find((x) => x.id_producto === Number(f.id_producto.value));
+    $('#hay').textContent = s ? `El sistema calcula ${num(s.stock_sede)} ${s.unidad}.` : '';
+};
+f.id_producto.addEventListener('change', mostrarHay);
+f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+        const r = await conBoton(f.querySelector('button'), () =>
+            api('POST', '/api/sede/verificacion', { id_producto: f.id_producto.value, cantidad_fisica: f.cantidad_fisica.value }));
+        mensaje(r.mensaje, r.diferencia ? 'aviso' : 'ok');
+        f.cantidad_fisica.value = '';
+        ({ stock } = await api('GET', '/api/sede/stock'));
+        mostrarHay();
+    } catch (e) { mostrarError(e); }
+});
+alCargar(async () => {
+    await iniciarPagina();
+    const p = await api('GET', '/api/sede/panel');
+    if (!p.control_iniciado) { location.href = '/sede/conteo-inicial'; return; }
+    stock = p.stock;
+    llenarSelect(f.id_producto, stock, 'id_producto', (s) => `${s.producto} (${s.unidad})`);
+});
+</script>
+</body>
+</html>
